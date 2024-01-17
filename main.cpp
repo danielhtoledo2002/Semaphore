@@ -5,34 +5,36 @@
 #include <mutex>
 #include <atomic>
 #include<condition_variable>
+
+
 struct semaphore  {
     std::mutex mtx ;
-    std::atomic_bool desbloqueado;
+    std::atomic_bool unlock;
     std::condition_variable condition;
     semaphore();
 };
 semaphore::semaphore(){
-    desbloqueado.store(true, std::memory_order_release);
+    unlock.store(true, std::memory_order_release);
 }
 
-void bloquear(semaphore * s){
+void lock(semaphore * s){
 
     std::unique_lock<std::mutex> lock(s->mtx);
-    s->condition.wait(lock, [&s]{return s->desbloqueado.load(std::memory_order_acquire);});
-    s->desbloqueado.store(false, std::memory_order_release);
+    s->condition.wait(lock, [&s]{return s->unlock.load(std::memory_order_acquire);});
+    s->unlock.store(false, std::memory_order_release);
 }
-void desbloquear(semaphore *s){
+void unlock(semaphore *s){
     std::unique_lock<std::mutex>lock(s->mtx);
-    s->desbloqueado.store(true, std::memory_order_release);
+    s->unlock.store(true, std::memory_order_release);
     s->condition.notify_one();
 }
 
 void write_file(semaphore *s, std::ofstream *file, std::uint8_t num) {
-    bloquear(s);
+    lock(s);
     if (file->is_open()) {
-        *file << "Hola desde ";
-        *file << "el proceso " << (int)num << std::endl;
-        desbloquear(s);
+        *file << "Hello from ";
+        *file << "thread " << (int)num << std::endl;
+        unlock(s);
     } else {
         std::cout << "Something was wrong" << std::endl;
     }
